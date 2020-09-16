@@ -1,11 +1,12 @@
 provider "aws" {
-  profile = var.profile
+  access_key = var.access_key
+  secret_key = var.secret_key
   region  = "us-east-1"
 }
 
 data "aws_availability_zones" "all" {}
 # Creating EC2 instance
-resource "aws_instance" "${var.app_name}" {
+resource "aws_instance" "instance" {
   ami                     = lookup(var.amis,var.region)
   count                   = var.serverCount
   key_name                = var.key_name
@@ -42,8 +43,8 @@ resource "aws_security_group" "instance" {
 }
 
 # Creating Launch Configuration
-resource "aws_launch_configuration" "${var.app_name}_launch-configuration" {
-  image_id               = lookup(var.amis,var.region)
+resource "aws_launch_configuration" "launch-configuration" {
+  image_id               = var.ami
   instance_type          = "t2.micro"
   security_groups        = [aws_security_group.instance.id]
   key_name               = var.key_name
@@ -53,12 +54,12 @@ resource "aws_launch_configuration" "${var.app_name}_launch-configuration" {
   }
 }
 # Creating AutoScaling Group
-resource "aws_autoscaling_group" "${var.app_name}_asg" {
-  launch_configuration  = aws_launch_configuration."${var.app_name}"_launch-configuration.id
+resource "aws_autoscaling_group" "asg" {
+  launch_configuration  = aws_launch_configuration.launch-configuration.id
   availability_zones    = [data.aws_availability_zones.all.names]
   min_size              = 2
   max_size              = 10
-  load_balancers        = [aws_alb."${var.app_name}"_alb.name]
+  load_balancers        = [aws_lb.alb.name]
   tag {
     key = "Name"
     value = "terraform-asg_${var.app_name}"
@@ -90,7 +91,7 @@ resource "aws_security_group" "alb" {
 }
 
 # Creating ALB
-resource "aws_lb" "${var.app_name}_alb" {
+resource "aws_lb" "alb" {
   name                        = "terraform-asg_${var.app_name}_alb"
   load_balancer_type          = "application"
   security_groups             = [aws_security_group.alb.id]
@@ -133,7 +134,7 @@ resource "aws_subnet" "public" {
 }
 
 # CodeDeploy app
-resource "aws_codedeploy_app" "${var.app_name}_cd" {
+resource "aws_codedeploy_app" "cd" {
   compute_platform = "Server"
   name             = "${var.app_name}_cd"
 }

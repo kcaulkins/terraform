@@ -15,24 +15,25 @@ variable "public_key_path" {
 variable "key_name" {
   type = string
   description = "Key name for SSHing into EC2"
-  default = "kaypair_name"
+  default = "keypair_name"
 }
-variable "amis" {
+variable "ami" {
   type = string
   description = "Base AMI to launch the instances"
-  default = {
-    us-east-1 = "ami-0d29b48622869dfd9"
-  }
+  default = "ami-0d29b48622869dfd9"
 }
 variable "office_ip" {
   type = string
   description = "Allowed SSH IP address"
   default = "0.0.0.0/0"
 }
-variable "profile" {
+variable "secret_key" {
   type = string
-  description = "What AWS CLI profile to use"
-  default = "default"
+  description = "What AWS secret key profile to use"
+}
+variable "access_key" {
+  type = string
+  description = "What AWS access key profile to use"
 }
 variable "app_name" {
   type = string
