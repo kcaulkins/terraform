@@ -7,7 +7,7 @@ data "aws_availability_zones" "all" {}
 # Creating EC2 instance
 resource "aws_instance" "${var.app_name}" {
   ami               = "${lookup(var.amis,var.region)}"
-  count             = "${var.count}"
+  count             = "${var.serverCount}"
   key_name               = "${var.key_name}"
   vpc_security_group_ids = ["${aws_security_group.instance.id}"]
   source_dest_check = false
