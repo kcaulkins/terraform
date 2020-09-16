@@ -1,19 +1,19 @@
 provider "aws" {
-  profile = "${var.profile}"
+  profile = var.profile
   region  = "us-east-1"
 }
 
 data "aws_availability_zones" "all" {}
 # Creating EC2 instance
 resource "aws_instance" "${var.app_name}" {
-  ami               = "${lookup(var.amis,var.region)}"
-  count             = "${var.serverCount}"
-  key_name               = "${var.key_name}"
-  vpc_security_group_ids = ["${aws_security_group.instance.id}"]
-  source_dest_check = false
-  instance_type = "t2.micro"
+  ami                     = lookup(var.amis,var.region)
+  count                   = var.serverCount
+  key_name                = var.key_name
+  vpc_security_group_ids  = [aws_security_group.instance.id]
+  source_dest_check       = false
+  instance_type           = "t2.micro"
 tags {
-    Name = "${format("${var.app_name}_%03d", count.index + 1)}"
+    Name = format("${var.app_name}_%03d", count.index + 1)
   }
 }
 
@@ -37,29 +37,28 @@ resource "aws_security_group" "instance" {
     from_port = 22
     to_port = 22
     protocol = "tcp"
-    cidr_blocks = ["${var.office_ip}"]
+    cidr_blocks = [var.office_ip]
   }
 }
 
 # Creating Launch Configuration
 resource "aws_launch_configuration" "${var.app_name}_launch-configuration" {
-  image_id               = "${lookup(var.amis,var.region)}"
+  image_id               = lookup(var.amis,var.region)
   instance_type          = "t2.micro"
-  security_groups        = ["${aws_security_group.instance.id}"]
-  key_name               = "${var.key_name}"
-  user_data              = "${file("user_data.sh")}" 
+  security_groups        = [aws_security_group.instance.id]
+  key_name               = var.key_name
+  user_data              = file("user_data.sh")
   lifecycle {
     create_before_destroy = true
   }
 }
 # Creating AutoScaling Group
 resource "aws_autoscaling_group" "${var.app_name}_asg" {
-  launch_configuration = "${aws_launch_configuration.${var.app_name}_launch-configuration.id}"
-  availability_zones = ["${data.aws_availability_zones.all.names}"]
-  min_size = 2
-  max_size = 10
-  load_balancers = ["${aws_elb.${var.app_name}_elb.name}"]
-  health_check_type = "ELB"
+  launch_configuration  = aws_launch_configuration."${var.app_name}"_launch-configuration.id
+  availability_zones    = [data.aws_availability_zones.all.names]
+  min_size              = 2
+  max_size              = 10
+  load_balancers        = [aws_alb."${var.app_name}"_alb.name]
   tag {
     key = "Name"
     value = "terraform-asg_${var.app_name}"
@@ -67,9 +66,9 @@ resource "aws_autoscaling_group" "${var.app_name}_asg" {
   }
 }
 
-# Security Group for ELB
-resource "aws_security_group" "elb" {
-  name = "${var.app_name}_elb-sg"
+# Security Group for ALB
+resource "aws_security_group" "alb" {
+  name = "${var.app_name}_alb-sg"
   egress {
     from_port = 0
     to_port = 0
@@ -90,11 +89,14 @@ resource "aws_security_group" "elb" {
   }
 }
 
-# Creating ELB
-resource "aws_elb" "${var.app_name}_elb" {
-  name = "terraform-asg_${var.app_name}"
-  security_groups = ["${aws_security_group.elb.id}"]
-  availability_zones = ["${data.aws_availability_zones.all.names}"]
+# Creating ALB
+resource "aws_lb" "${var.app_name}_alb" {
+  name                        = "terraform-asg_${var.app_name}_alb"
+  load_balancer_type          = "application"
+  security_groups             = [aws_security_group.alb.id]
+  enable_deletion_protection  = true
+  subnets                     = [aws_subnet.public.*.id]
+
   health_check {
     healthy_threshold = 2
     unhealthy_threshold = 2
@@ -113,7 +115,20 @@ resource "aws_elb" "${var.app_name}_elb" {
     lb_protocol = "https"
     instance_port = "443"
     instance_protocol = "https"
-    ssl_certificate_id = "${var.ssl_cert_arn}"
+    ssl_certificate_id = var.ssl_cert_arn
+  }
+}
+
+# VPC and Subnet
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+}
+resource "aws_subnet" "public" {
+  vpc_id     = aws_vpc.main.id
+  cidr_block = "10.0.1.0/24"
+
+  tags = {
+    Name = "Main"
   }
 }
 
