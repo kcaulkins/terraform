@@ -1,0 +1,3 @@
+variables.tf
+user_data.sh
+.terraform
